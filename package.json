@@ -1,0 +1,25 @@
+{
+  "name": "luxxie-platform",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @luxxie/web",
+    "dev:admin": "npm run dev --workspace @luxxie/admin",
+    "dev:api": "npm run start:dev --workspace @luxxie/api",
+    "typecheck": "npm run typecheck --workspace @luxxie/schemas && npm run build --workspace @luxxie/schemas && npm run typecheck --workspace @luxxie/types && npm run build --workspace @luxxie/types && npm run typecheck --workspace @luxxie/api-client && npm run build --workspace @luxxie/api-client && npm run typecheck --workspace @luxxie/api && npm run typecheck --workspace @luxxie/web && npm run typecheck --workspace @luxxie/admin",
+    "build": "npm run build --workspace @luxxie/schemas && npm run build --workspace @luxxie/types && npm run build --workspace @luxxie/api-client && npm run build --workspace @luxxie/api && npm run build --workspace @luxxie/web && npm run build --workspace @luxxie/admin",
+    "test": "vitest run",
+    "db:migrate": "npm run db:migrate --workspace @luxxie/api",
+    "db:seed:dev": "docker compose exec -T db psql -U luxxie -d luxxie < database/seeds/development.sql",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  }
+}

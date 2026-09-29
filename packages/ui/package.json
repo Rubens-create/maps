@@ -1,0 +1,10 @@
+{
+  "name": "@luxxie/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./style.css": "./style.css"
+  },
+  "files": ["style.css"]
+}

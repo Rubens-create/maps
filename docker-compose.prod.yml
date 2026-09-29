@@ -1,0 +1,32 @@
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD para produção}
+    ports: !reset []
+    restart: unless-stopped
+
+  api:
+    command: ["node", "dist/main.js"]
+    environment:
+      DATABASE_URL: postgresql://luxxie:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD para produção}@db:5432/luxxie
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com pelo menos 32 caracteres}
+      WEB_ORIGIN: ${WEB_ORIGIN:?Defina WEB_ORIGIN com a origem HTTPS configurada no Coolify}
+    ports: !reset []
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  web:
+    ports: !reset []
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  admin:
+    build:
+      args:
+        VITE_WEB_URL: ${VITE_WEB_URL:?Defina o domínio público da busca pública}
+    ports: !reset []
+    expose:
+      - "80"
+    restart: unless-stopped
