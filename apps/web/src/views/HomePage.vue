@@ -7,12 +7,6 @@
       @viewport-change="onViewportChange"
     />
 
-    <!-- Loading overlay -->
-    <div v-if="carregando" class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Carregando imóveis...</p>
-    </div>
-
     <!-- Erro de conexão -->
     <div v-if="erroConexao" class="erro-toast">
       <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>{{ erroConexao }}
@@ -44,7 +38,6 @@ import PropertyModal from '@/components/PropertyModal.vue'
 type MapViewport = Omit<MapBounds, 'tipo'>
 
 const mapItems = ref<MapResultItem[]>([])
-const carregando = ref(true)
 const erroConexao = ref('')
 const filtroAtivo = ref<PropertyType | null>(null)
 const imovelSelecionado = ref<Property | null>(null)
@@ -68,7 +61,6 @@ async function carregarMapa(viewport: MapViewport): Promise<void> {
   buscaEmAndamento?.abort()
   const controller = new AbortController()
   buscaEmAndamento = controller
-  carregando.value = true
   erroConexao.value = ''
 
   try {
@@ -82,8 +74,6 @@ async function carregarMapa(viewport: MapViewport): Promise<void> {
     if (!controller.signal.aborted) {
       erroConexao.value = error instanceof Error ? error.message : 'Erro ao consultar imóveis.'
     }
-  } finally {
-    if (!controller.signal.aborted) carregando.value = false
   }
 }
 
@@ -111,34 +101,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page { height: 100vh; width: 100%; position: relative; overflow: hidden; }
-
-.loading-overlay {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  padding: 24px 32px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  z-index: 9500;
-  font-weight: 600;
-  color: var(--text-mid);
-  font-size: 14px;
-}
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .erro-toast {
   position: fixed;
