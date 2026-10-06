@@ -8,6 +8,18 @@
           <span class="badge-tipo">{{ imovel.tipo }}</span>
         </div>
         <button class="close-btn gallery-close" @click="$emit('fechar')">×</button>
+        <button
+          class="close-btn gallery-favorite"
+          :class="{ 'is-favorite': favorito }"
+          type="button"
+          :aria-label="favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+          :aria-pressed="favorito"
+          :disabled="carregandoFavorito"
+          @click="alternarFavorito"
+        >
+          <i v-if="carregandoFavorito" class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+          <i v-else :class="favorito ? 'fas fa-heart' : 'far fa-heart'" aria-hidden="true"></i>
+        </button>
       </div>
 
       <!-- Informações -->
@@ -57,8 +69,26 @@
 import { computed } from 'vue'
 import type { Property, PropertyType } from '@luxxie/types'
 
-const props = defineProps<{ imovel: Property | null }>()
-defineEmits<{ fechar: [] }>()
+const props = defineProps<{
+  imovel: Property | null
+  autenticado: boolean
+  favorito: boolean
+  carregandoFavorito: boolean
+}>()
+const emit = defineEmits<{
+  fechar: []
+  alternarFavorito: [id: number]
+  solicitarLogin: []
+}>()
+
+function alternarFavorito(): void {
+  if (!props.imovel || props.carregandoFavorito) return
+  if (!props.autenticado) {
+    emit('solicitarLogin')
+    return
+  }
+  emit('alternarFavorito', props.imovel.id)
+}
 
 function formatarPreco(valor: number | null, tipo: PropertyType): string {
   if (!valor) return '—'
@@ -110,6 +140,13 @@ const whatsappLink = computed(() => {
   top: 12px;
   right: 12px;
 }
+.gallery-favorite {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+.gallery-favorite.is-favorite { color: #dc2626; }
+.gallery-favorite:disabled { cursor: wait; opacity: 0.75; }
 
 .prop-title {
   font-size: 20px;

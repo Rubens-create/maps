@@ -2,6 +2,7 @@ export type {
   MapBounds,
   MapResult,
   MapResultItem,
+  MapPropertyFilters,
   PropertyMapItem,
   LoginInput,
   PropertyInput,

@@ -22,4 +22,26 @@ describe('MapBoundsSchema', () => {
       tipo: 'Aluguel',
     })
   })
+
+  it('parses property filters from map query values', () => {
+    expect(MapBoundsSchema.parse({
+      west: '-47.9', south: '-23.7', east: '-46.4', north: '-23.3', zoom: '12',
+      precoMaiorQue: '250000', precoMenorQue: '900000', quartos: '2',
+      banheiros: '1', areaMin: '80', aceitaPet: 'true',
+    })).toMatchObject({
+      precoMaiorQue: 250000,
+      precoMenorQue: 900000,
+      quartos: 2,
+      banheiros: 1,
+      areaMin: 80,
+      aceitaPet: true,
+    })
+  })
+
+  it('rejects a price minimum that is not below the maximum', () => {
+    expect(() => MapBoundsSchema.parse({
+      west: '-47.9', south: '-23.7', east: '-46.4', north: '-23.3', zoom: '12',
+      precoMaiorQue: '900000', precoMenorQue: '250000',
+    })).toThrow()
+  })
 })

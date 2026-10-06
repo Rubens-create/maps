@@ -7,11 +7,25 @@ export const MapBoundsSchema = z.object({
   north: z.coerce.number().finite().min(-90).max(90),
   zoom: z.coerce.number().int().min(0).max(22),
   tipo: z.enum(['Venda', 'Aluguel']).optional(),
+  precoMaiorQue: z.coerce.number().finite().nonnegative().optional(),
+  precoMenorQue: z.coerce.number().finite().positive().optional(),
+  quartos: z.coerce.number().int().min(1).max(100).optional(),
+  banheiros: z.coerce.number().int().min(1).max(100).optional(),
+  areaMin: z.coerce.number().finite().positive().optional(),
+  aceitaPet: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
 }).refine(({ west, south, east, north }) => west < east && south < north, {
   message: 'Bounding box coordinates must be ordered west-to-east and south-to-north',
+}).refine(({ precoMaiorQue, precoMenorQue }) => (
+  precoMaiorQue === undefined || precoMenorQue === undefined || precoMaiorQue < precoMenorQue
+), {
+  message: 'The minimum price must be lower than the maximum price',
+  path: ['precoMenorQue'],
 })
 
 export type MapBounds = z.infer<typeof MapBoundsSchema>
+export type MapPropertyFilters = Pick<MapBounds,
+  'precoMaiorQue' | 'precoMenorQue' | 'quartos' | 'banheiros' | 'areaMin' | 'aceitaPet'
+>
 
 export const PropertyMapItemSchema = z.object({
   id: z.number().int().positive(),

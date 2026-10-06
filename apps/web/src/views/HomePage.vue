@@ -18,21 +18,43 @@
       @filtrar="alternarFiltro"
     />
 
+    <QuickMenu
+      ref="quickMenuRef"
+      @abrir-filtros="filtrosAbertos = true"
+      @abrir-favoritos="abrirFavoritos"
+      @usuario-alterado="atualizarUsuario"
+    />
+
+    <FiltersDialog
+      :aberto="filtrosAbertos"
+      :model-value="filtrosAtivos"
+      @fechar="filtrosAbertos = false"
+      @aplicar="aplicarFiltros"
+    />
+
     <!-- Modal detalhes -->
     <PropertyModal
       :imovel="imovelSelecionado"
+      :autenticado="usuario !== null"
+      :favorito="imovelFavorito"
+      :carregando-favorito="favoritoEmAtualizacao"
       @fechar="imovelSelecionado = null"
+      @alternar-favorito="alternarFavorito"
+      @solicitar-login="quickMenuRef?.abrirConta()"
     />
 
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
-import type { MapBounds, MapResultItem, Property, PropertyMapItem, PropertyType } from '@luxxie/types'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import type { AuthUser, MapBounds, MapPropertyFilters, MapResultItem, Property, PropertyMapItem, PropertyType } from '@luxxie/types'
 import { api } from '@luxxie/api-client'
 import MapView from '@/components/MapView.vue'
 import NavBar from '@/components/NavBar.vue'
+import QuickMenu from '@/components/QuickMenu.vue'
+import FiltersDialog from '@/components/FiltersDialog.vue'
 import PropertyModal from '@/components/PropertyModal.vue'
 
 type MapViewport = Omit<MapBounds, 'tipo'>
@@ -40,12 +62,23 @@ type MapViewport = Omit<MapBounds, 'tipo'>
 const mapItems = ref<MapResultItem[]>([])
 const erroConexao = ref('')
 const filtroAtivo = ref<PropertyType | null>(null)
+const filtrosAtivos = ref<MapPropertyFilters>({})
+const filtrosAbertos = ref(false)
 const imovelSelecionado = ref<Property | null>(null)
+const usuario = ref<AuthUser | null>(null)
+const favoritosIds = ref<number[]>([])
+const favoritoEmAtualizacao = ref(false)
+const quickMenuRef = ref<{ abrirConta: () => void } | null>(null)
+const router = useRouter()
+const imovelFavorito = computed(() => (
+  imovelSelecionado.value !== null && favoritosIds.value.includes(imovelSelecionado.value.id)
+))
 
 const viewportAtual = ref<MapViewport | null>(null)
 
 let debounceBusca: ReturnType<typeof setTimeout> | null = null
 let buscaEmAndamento: AbortController | null = null
+let buscaFavoritosId = 0
 
 function onViewportChange(viewport: MapViewport): void {
   viewportAtual.value = viewport
@@ -66,6 +99,7 @@ async function carregarMapa(viewport: MapViewport): Promise<void> {
   try {
     const resultado = await api.searchMap({
       ...viewport,
+      ...filtrosAtivos.value,
       tipo: filtroAtivo.value ?? undefined,
     }, controller.signal)
     if (!controller.signal.aborted) mapItems.value = resultado.items
@@ -83,6 +117,58 @@ watch(filtroAtivo, () => {
 
 function alternarFiltro(tipo: PropertyType): void {
   filtroAtivo.value = filtroAtivo.value === tipo ? null : tipo
+}
+
+function aplicarFiltros(filtros: MapPropertyFilters): void {
+  filtrosAtivos.value = filtros
+  filtrosAbertos.value = false
+  if (viewportAtual.value) agendarBusca(viewportAtual.value)
+}
+
+function abrirFavoritos(): void {
+  void router.push({ name: 'favoritos' })
+}
+
+function atualizarUsuario(usuarioAtual: AuthUser | null): void {
+  usuario.value = usuarioAtual
+  favoritosIds.value = []
+  const requestId = ++buscaFavoritosId
+  if (!usuarioAtual) return
+
+  void api.listFavorites().then((favoritos) => {
+    if (requestId === buscaFavoritosId && usuario.value?.id === usuarioAtual.id) {
+      favoritosIds.value = favoritos.map((favorito) => favorito.id)
+    }
+  }).catch((error: unknown) => {
+    if (requestId === buscaFavoritosId && usuario.value?.id === usuarioAtual.id) {
+      erroConexao.value = error instanceof Error ? error.message : 'Não foi possível carregar os favoritos.'
+    }
+  })
+}
+
+async function alternarFavorito(propertyId: number): Promise<void> {
+  if (!usuario.value) {
+    quickMenuRef.value?.abrirConta()
+    return
+  }
+  if (favoritoEmAtualizacao.value) return
+
+  favoritoEmAtualizacao.value = true
+  erroConexao.value = ''
+  const jaFavoritado = favoritosIds.value.includes(propertyId)
+  try {
+    if (jaFavoritado) {
+      await api.removeFavorite(propertyId)
+      favoritosIds.value = favoritosIds.value.filter((id) => id !== propertyId)
+    } else {
+      await api.addFavorite(propertyId)
+      if (!favoritosIds.value.includes(propertyId)) favoritosIds.value = [...favoritosIds.value, propertyId]
+    }
+  } catch (error) {
+    erroConexao.value = error instanceof Error ? error.message : 'Não foi possível atualizar os favoritos.'
+  } finally {
+    favoritoEmAtualizacao.value = false
+  }
 }
 
 async function abrirDetalhes(imovel: PropertyMapItem): Promise<void> {

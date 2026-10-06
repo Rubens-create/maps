@@ -18,6 +18,12 @@ export class MapController {
   @ApiQuery({ name: 'north', type: Number, required: true, description: 'Latitude máxima' })
   @ApiQuery({ name: 'zoom', type: Number, required: true, minimum: 0, maximum: 22 })
   @ApiQuery({ name: 'tipo', enum: ['Venda', 'Aluguel'], required: false })
+  @ApiQuery({ name: 'precoMaiorQue', type: Number, required: false })
+  @ApiQuery({ name: 'precoMenorQue', type: Number, required: false })
+  @ApiQuery({ name: 'quartos', type: Number, required: false, description: 'Quantidade exata de quartos' })
+  @ApiQuery({ name: 'banheiros', type: Number, required: false, description: 'Quantidade exata de banheiros' })
+  @ApiQuery({ name: 'areaMin', type: Number, required: false })
+  @ApiQuery({ name: 'aceitaPet', enum: ['true', 'false'], required: false })
   @ApiResponse({ status: 200, description: 'Pontos ou agrupamentos dentro do bounding box' })
   findVisible(@Query(new ZodValidationPipe(MapBoundsSchema)) bounds: MapBounds) {
     return this.map.findVisible(bounds)

@@ -86,6 +86,12 @@ export const api = {
       zoom: String(bounds.zoom),
     })
     if (bounds.tipo) params.set('tipo', bounds.tipo)
+    if (bounds.precoMaiorQue !== undefined) params.set('precoMaiorQue', String(bounds.precoMaiorQue))
+    if (bounds.precoMenorQue !== undefined) params.set('precoMenorQue', String(bounds.precoMenorQue))
+    if (bounds.quartos !== undefined) params.set('quartos', String(bounds.quartos))
+    if (bounds.banheiros !== undefined) params.set('banheiros', String(bounds.banheiros))
+    if (bounds.areaMin !== undefined) params.set('areaMin', String(bounds.areaMin))
+    if (bounds.aceitaPet !== undefined) params.set('aceitaPet', String(bounds.aceitaPet))
     return request<MapResult>(`/map/properties?${params}`, { signal })
   },
 
@@ -102,6 +108,18 @@ export const api = {
 
   myProperties(): Promise<Property[]> {
     return request<Property[]>('/users/me/properties')
+  },
+
+  listFavorites(): Promise<Property[]> {
+    return request<Property[]>('/favorites')
+  },
+
+  addFavorite(propertyId: number): Promise<{ favoritado: true }> {
+    return request<{ favoritado: true }>(`/favorites/${propertyId}`, { method: 'POST' })
+  },
+
+  removeFavorite(propertyId: number): Promise<{ favoritado: false }> {
+    return request<{ favoritado: false }>(`/favorites/${propertyId}`, { method: 'DELETE' })
   },
 
   deleteProperty(id: number): Promise<{ deleted: true }> {

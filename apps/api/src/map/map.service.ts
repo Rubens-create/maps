@@ -24,6 +24,12 @@ export class MapService {
          WHERE location && ST_MakeEnvelope($1, $2, $3, $4, 4326)
            AND ST_Intersects(location, ST_MakeEnvelope($1, $2, $3, $4, 4326))
            AND ($6::text IS NULL OR tipo = $6)
+           AND ($7::numeric IS NULL OR preco > $7)
+           AND ($8::numeric IS NULL OR preco < $8)
+           AND ($9::integer IS NULL OR quartos = $9)
+           AND ($10::integer IS NULL OR banheiros = $10)
+           AND ($11::numeric IS NULL OR area >= $11)
+           AND ($12::boolean IS NULL OR aceita_pet = $12)
        ), grouped AS (
          SELECT floor(ST_X(point_3857) / $5)::bigint AS cell_x,
                 floor(ST_Y(point_3857) / $5)::bigint AS cell_y,
@@ -43,7 +49,20 @@ export class MapService {
               CASE WHEN item_count = 1 THEN properties -> 0 ELSE NULL END AS property
        FROM grouped
        ORDER BY item_count DESC`,
-      [bounds.west, bounds.south, bounds.east, bounds.north, cellSizeMeters, bounds.tipo ?? null],
+      [
+        bounds.west,
+        bounds.south,
+        bounds.east,
+        bounds.north,
+        cellSizeMeters,
+        bounds.tipo ?? null,
+        bounds.precoMaiorQue ?? null,
+        bounds.precoMenorQue ?? null,
+        bounds.quartos ?? null,
+        bounds.banheiros ?? null,
+        bounds.areaMin ?? null,
+        bounds.aceitaPet ?? null,
+      ],
     )
 
     return { items: result.rows.map((row) => ({

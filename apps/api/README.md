@@ -19,5 +19,6 @@ API HTTP em NestJS/TypeScript. A documentação OpenAPI/Swagger fica em `/docs` 
 - `POST /api/properties` com Bearer token
 - `DELETE /api/properties/:id` com Bearer token
 - `GET /api/users/me/properties` com Bearer token
+- `GET /api/favorites`, `POST /api/favorites/:propertyId` e `DELETE /api/favorites/:propertyId` com Bearer token
 
 A busca do mapa exige bounding box e retorna propriedades individuais ou agrupamentos por célula espacial conforme o zoom. As consultas selecionam somente os campos usados pelo mapa.

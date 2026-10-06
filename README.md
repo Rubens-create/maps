@@ -6,7 +6,7 @@ Monorepo TypeScript com frontend Vue 3/Vite e API NestJS, organizado em workspac
 
 - `apps/web`: experiência pública de busca e mapa.
 - `apps/admin`: dashboard para login, publicação e gestão de anúncios.
-- `apps/api`: API NestJS com autenticação JWT, usuários, imóveis e mapa.
+- `apps/api`: API NestJS com autenticação JWT, usuários, imóveis, favoritos e mapa.
 - `packages/schemas`: schemas Zod compartilhados e validação em runtime.
 - `packages/types`: tipos compartilhados inferidos dos schemas.
 - `packages/api-client`: cliente HTTP compartilhado pelos dois frontends.
@@ -34,6 +34,7 @@ O Compose aplica as migrações antes de iniciar a API e mantém o PostgreSQL em
 - `GET /api/properties/:id`
 - `POST /api/properties` e `DELETE /api/properties/:id` (Bearer token)
 - `GET /api/users/me` e `GET /api/users/me/properties` (Bearer token)
+- `GET /api/favorites`, `POST /api/favorites/:propertyId` e `DELETE /api/favorites/:propertyId` (Bearer token)
 
 A tela do mapa consulta novamente após movimento/zoom, com debounce e cancelamento de pedidos antigos. A API limita a consulta à bounding box visível, aplica filtros no banco e agrupa pontos próximos conforme o zoom.
 
