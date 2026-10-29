@@ -36,9 +36,6 @@ onMounted(() => {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map)
 
-  // Controle de zoom no canto inferior direito
-  L.control.zoom({ position: 'bottomright' }).addTo(map)
-
   markersLayer = L.layerGroup().addTo(map)
   map.on('moveend', emitirViewport)
   desenharPinos(props.items)

@@ -7,6 +7,7 @@ export type {
   LoginInput,
   PropertyInput,
   RegisterInput,
+  UserPreciseLocationInput,
 } from '@luxxie/schemas'
 
 export type PropertyType = 'Venda' | 'Aluguel'
@@ -22,6 +23,19 @@ export interface AuthResponse {
   tokenType: 'Bearer'
   expiresIn: number
   user: AuthUser
+}
+
+export interface PreciseLocation {
+  latitude: number
+  longitude: number
+  capturedAt: string
+  expiresAt: string
+}
+
+export interface UserLocationSettings {
+  enabled: boolean
+  consentVersion: number
+  location: PreciseLocation | null
 }
 
 export interface Property {

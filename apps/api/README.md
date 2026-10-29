@@ -20,5 +20,9 @@ API HTTP em NestJS/TypeScript. A documentação OpenAPI/Swagger fica em `/docs` 
 - `DELETE /api/properties/:id` com Bearer token
 - `GET /api/users/me/properties` com Bearer token
 - `GET /api/favorites`, `POST /api/favorites/:propertyId` e `DELETE /api/favorites/:propertyId` com Bearer token
+- `POST /api/auth/logout` revoga a sessão Bearer atual
+- `GET`, `PUT` e `DELETE /api/users/me/location`, além de `POST /api/users/me/location/refresh`, com Bearer token; as gravações usam a versão de consentimento e a validade é configurada por `USER_PRECISE_LOCATION_TTL_HOURS` (24 horas por padrão)
+
+A migração de sessões invalida tokens emitidos antes da versão com `jti`; usuários podem precisar entrar novamente após a implantação.
 
 A busca do mapa exige bounding box e retorna propriedades individuais ou agrupamentos por célula espacial conforme o zoom. As consultas selecionam somente os campos usados pelo mapa.

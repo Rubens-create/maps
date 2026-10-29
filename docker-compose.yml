@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgresql://luxxie:${POSTGRES_PASSWORD:-local-dev-change-this-password}@db:5432/luxxie
       JWT_SECRET: ${JWT_SECRET:-local-only-change-me-to-a-long-random-secret-32chars}
       WEB_ORIGIN: "${WEB_ORIGIN:-http://localhost:5173,http://localhost:5174,http://localhost:8081,http://localhost:8082}"
+      USER_PRECISE_LOCATION_TTL_HOURS: ${USER_PRECISE_LOCATION_TTL_HOURS:-24}
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +43,9 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        VITE_IP_LOCATION_CACHE_HOURS: ${VITE_IP_LOCATION_CACHE_HOURS:-24}
+        VITE_ANONYMOUS_PRECISE_LOCATION_CACHE_HOURS: ${VITE_ANONYMOUS_PRECISE_LOCATION_CACHE_HOURS:-24}
     depends_on:
       api:
         condition: service_healthy

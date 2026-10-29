@@ -8,9 +8,19 @@ import type {
   PropertyInput,
   PropertyMapItem,
   RegisterInput,
+  UserLocationSettings,
+  UserPreciseLocationInput,
 } from '@luxxie/types'
 
-const tokenStorageKey = 'luxxie.access-token'
+export const AUTH_TOKEN_STORAGE_KEY = 'luxxie.access-token'
+export const AUTH_SESSION_CHANGED_EVENT = 'luxxie:auth-session-changed'
+let authRevision = 0
+let authOperationGeneration = 0
+let lastObservedToken: string | null | undefined
+
+function dispatchAuthSessionChanged(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent?.(new Event(AUTH_SESSION_CHANGED_EVENT))
+}
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -20,57 +30,153 @@ export class ApiError extends Error {
 }
 
 function getToken(): string | null {
-  return typeof window === 'undefined' ? null : window.localStorage.getItem(tokenStorageKey)
+  if (typeof window === 'undefined') return null
+  const token = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+  if (lastObservedToken === undefined) {
+    lastObservedToken = token
+  } else if (lastObservedToken !== token) {
+    lastObservedToken = token
+    authRevision += 1
+    authOperationGeneration += 1
+    dispatchAuthSessionChanged()
+  }
+  return token
 }
 
 function saveToken(token: string): void {
-  window.localStorage.setItem(tokenStorageKey, token)
+  const previousToken = getToken()
+  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token)
+  lastObservedToken = token
+  if (previousToken !== token) {
+    authRevision += 1
+    authOperationGeneration += 1
+    dispatchAuthSessionChanged()
+  }
+}
+
+function removeToken(expectedToken?: string): boolean {
+  if (typeof window === 'undefined') return false
+  const currentToken = getToken()
+  if (expectedToken !== undefined && currentToken !== expectedToken) return false
+  if (currentToken === null) return false
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+  lastObservedToken = null
+  authRevision += 1
+  authOperationGeneration += 1
+  dispatchAuthSessionChanged()
+  return true
 }
 
 export function clearToken(): void {
-  if (typeof window !== 'undefined') window.localStorage.removeItem(tokenStorageKey)
+  authOperationGeneration += 1
+  removeToken()
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== AUTH_TOKEN_STORAGE_KEY) return
+    lastObservedToken = event.newValue
+    authRevision += 1
+    authOperationGeneration += 1
+    dispatchAuthSessionChanged()
+  })
+}
+
+async function request<T>(path: string, init: RequestInit = {}, tokenOverride?: string | null): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
 
-  const token = getToken()
+  const token = tokenOverride === undefined ? getToken() : tokenOverride
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const response = await fetch(`/api${path}`, { ...init, headers })
   const payload: unknown = response.status === 204 ? null : await response.json().catch(() => null)
 
   if (!response.ok) {
-    if (response.status === 401) clearToken()
-    const errorPayload = payload as { message?: string | string[] } | null
+    if (response.status === 401 && token) removeToken(token)
+    const errorPayload = payload as {
+      message?: string | string[]
+      issues?: Array<{ path?: string; message?: string }>
+    } | null
     const message = Array.isArray(errorPayload?.message)
       ? errorPayload.message.join(', ')
       : errorPayload?.message ?? `Falha na API (${response.status})`
-    throw new ApiError(message, response.status)
+    const issues = errorPayload?.issues
+      ?.filter((issue): issue is { path?: string; message: string } => typeof issue.message === 'string')
+      .map(({ path, message: issueMessage }) => path ? `${path}: ${issueMessage}` : issueMessage)
+      .join('; ')
+    throw new ApiError(issues ? `${message} (${issues})` : message, response.status)
   }
 
   return payload as T
 }
 
 async function authenticate(path: '/auth/register' | '/auth/login', input: RegisterInput | LoginInput): Promise<AuthUser> {
+  const operationGeneration = ++authOperationGeneration
   const result = await request<AuthResponse>(path, {
     method: 'POST',
     body: JSON.stringify(input),
-  })
+  }, null)
+  getToken()
+  if (operationGeneration !== authOperationGeneration) {
+    void request('/auth/logout', { method: 'POST' }, result.accessToken).catch(() => undefined)
+    throw new ApiError('A autenticação foi cancelada porque a sessão mudou.', 409)
+  }
   saveToken(result.accessToken)
   return result.user
+}
+
+async function requestForCurrentSession<T>(path: string, init: RequestInit = {}, expectedRevision?: number): Promise<T> {
+  const token = getToken()
+  const revision = authRevision
+  if (!token) throw new ApiError('Sessão não autenticada.', 401)
+  if (expectedRevision !== undefined && expectedRevision !== revision) {
+    throw new ApiError('A sessão mudou. Atualize a página e tente novamente.', 401)
+  }
+
+  const payload = await request<T>(path, init, token)
+  if (getToken() !== token || authRevision !== revision) {
+    throw new ApiError('A sessão mudou durante a operação.', 401)
+  }
+  return payload
 }
 
 export const api = {
   register: (input: RegisterInput) => authenticate('/auth/register', input),
   login: (input: LoginInput) => authenticate('/auth/login', input),
-  logout: (): void => clearToken(),
+  async logout(): Promise<void> {
+    authOperationGeneration += 1
+    const token = getToken()
+    if (!token) return
+    removeToken(token)
+    try {
+      await request('/auth/logout', { method: 'POST' }, token)
+    } catch {
+      // A sessão é removida do navegador mesmo se a revogação remota estiver indisponível.
+    }
+  },
+
+  authSessionRevision(): number {
+    getToken()
+    return authRevision
+  },
+
+  hasAuthToken(): boolean {
+    return getToken() !== null
+  },
+
+  isAuthSessionCurrent(revision: number): boolean {
+    getToken()
+    return authRevision === revision
+  },
 
   async currentUser(): Promise<AuthUser | null> {
-    if (!getToken()) return null
+    const token = getToken()
+    if (!token) return null
+    const revision = authRevision
     try {
-      return await request<AuthUser>('/users/me')
+      const user = await request<AuthUser>('/users/me', {}, token)
+      return getToken() === token && authRevision === revision ? user : null
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) return null
       throw error
@@ -108,6 +214,28 @@ export const api = {
 
   myProperties(): Promise<Property[]> {
     return request<Property[]>('/users/me/properties')
+  },
+
+  myLocationSettings(expectedRevision?: number): Promise<UserLocationSettings> {
+    return requestForCurrentSession<UserLocationSettings>('/users/me/location', {}, expectedRevision)
+  },
+
+  saveMyLocation(input: UserPreciseLocationInput, expectedRevision?: number): Promise<UserLocationSettings> {
+    return requestForCurrentSession<UserLocationSettings>('/users/me/location', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }, expectedRevision)
+  },
+
+  refreshMyLocation(input: UserPreciseLocationInput, expectedRevision?: number): Promise<UserLocationSettings> {
+    return requestForCurrentSession<UserLocationSettings>('/users/me/location/refresh', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, expectedRevision)
+  },
+
+  deleteMyLocation(expectedRevision?: number): Promise<UserLocationSettings> {
+    return requestForCurrentSession<UserLocationSettings>('/users/me/location', { method: 'DELETE' }, expectedRevision)
   },
 
   listFavorites(): Promise<Property[]> {

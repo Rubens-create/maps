@@ -1,8 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { LoginSchema, RegisterSchema } from '@luxxie/schemas'
 import type { LoginInput, RegisterInput } from '@luxxie/types'
 import { ZodValidationPipe } from '../common/zod-validation.pipe'
+import { AuthenticatedRequest, JwtAuthGuard } from './jwt-auth.guard'
 import { AuthService } from './auth.service'
 
 const registerBody = {
@@ -45,5 +46,13 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   login(@Body(new ZodValidationPipe(LoginSchema)) body: LoginInput) {
     return this.auth.login(body)
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Encerrar a sessão autenticada atual' })
+  @ApiResponse({ status: 200, description: 'Sessão revogada' })
+  logout(@Req() request: AuthenticatedRequest) {
+    return this.auth.logout(request.user!.sub, request.user!.jti)
   }
 }

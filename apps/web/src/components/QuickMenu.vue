@@ -52,20 +52,22 @@
       @fechar="contaAberta = false"
       @autenticado="receberAutenticacao"
       @sair="sairDaConta"
+      @localizacao-alterada="emit('localizacaoAlterada', $event)"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AuthUser } from '@luxxie/types'
-import { api } from '@luxxie/api-client'
+import type { AuthUser, UserLocationSettings } from '@luxxie/types'
+import { api, AUTH_SESSION_CHANGED_EVENT } from '@luxxie/api-client'
 import AccountDialog from '@/components/AccountDialog.vue'
 
 const emit = defineEmits<{
   abrirFiltros: []
   abrirFavoritos: []
   usuarioAlterado: [usuario: AuthUser | null]
+  localizacaoAlterada: [settings: UserLocationSettings]
 }>()
 
 const opcoesMenu = [
@@ -85,6 +87,7 @@ const itensMenu = computed(() => opcoesMenu.map((item) => (
 )))
 const primeiroNome = computed(() => usuario.value?.nome.trim().split(/\s+/)[0] ?? '')
 const iniciais = computed(() => primeiroNome.value.slice(0, 1).toLocaleUpperCase('pt-BR'))
+let userRequestId = 0
 
 function fecharMenu(): void {
   menuAberto.value = false
@@ -108,27 +111,51 @@ function selecionarItem(item: { id: string }): void {
 }
 
 function receberAutenticacao(usuarioAutenticado: AuthUser): void {
+  userRequestId += 1
   usuario.value = usuarioAutenticado
+  verificandoSessao.value = false
   emit('usuarioAlterado', usuarioAutenticado)
 }
 
 function sairDaConta(): void {
-  api.logout()
+  userRequestId += 1
+  void api.logout()
   usuario.value = null
+  verificandoSessao.value = false
   contaAberta.value = false
   emit('usuarioAlterado', null)
 }
 
 async function carregarUsuario(): Promise<void> {
+  const requestId = ++userRequestId
+  const sessionRevision = api.authSessionRevision()
   verificandoSessao.value = true
   try {
-    usuario.value = await api.currentUser()
-    emit('usuarioAlterado', usuario.value)
+    const currentUser = await api.currentUser()
+    if (requestId !== userRequestId || !api.isAuthSessionCurrent(sessionRevision)) return
+    usuario.value = currentUser
+    emit('usuarioAlterado', currentUser)
   } catch {
     // Mantém o último estado conhecido quando a API estiver temporariamente indisponível.
   } finally {
-    verificandoSessao.value = false
+    if (requestId === userRequestId) {
+      if (!api.isAuthSessionCurrent(sessionRevision)) {
+        usuario.value = null
+        emit('usuarioAlterado', null)
+      }
+      verificandoSessao.value = false
+    }
   }
+}
+
+function atualizarSessaoAutenticada(): void {
+  userRequestId += 1
+  usuario.value = null
+  const hasToken = api.hasAuthToken()
+  verificandoSessao.value = hasToken
+  emit('usuarioAlterado', null)
+  if (hasToken) void carregarUsuario()
+  else verificandoSessao.value = false
 }
 
 function fecharAoClicarFora(event: PointerEvent): void {
@@ -144,12 +171,15 @@ function fecharComEscape(event: KeyboardEvent): void {
 onMounted(() => {
   document.addEventListener('pointerdown', fecharAoClicarFora)
   document.addEventListener('keydown', fecharComEscape)
+  window.addEventListener(AUTH_SESSION_CHANGED_EVENT, atualizarSessaoAutenticada)
   void carregarUsuario()
 })
 
 onBeforeUnmount(() => {
+  userRequestId += 1
   document.removeEventListener('pointerdown', fecharAoClicarFora)
   document.removeEventListener('keydown', fecharComEscape)
+  window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, atualizarSessaoAutenticada)
 })
 
 defineExpose({ abrirConta })

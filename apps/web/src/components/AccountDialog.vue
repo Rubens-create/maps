@@ -38,6 +38,60 @@
             Você está conectado à sua conta.
           </p>
 
+          <section class="account-location" aria-labelledby="account-location-title">
+            <div class="account-location-heading">
+              <h3 id="account-location-title">Minha localização</h3>
+              <p>A localização precisa fica vinculada à sua conta por tempo limitado.</p>
+            </div>
+
+            <p v-if="carregandoLocalizacao" class="account-location-status" role="status">
+              <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+              Consultando localização salva...
+            </p>
+            <p v-else-if="configuracaoLocalizacao?.location" class="account-location-status">
+              <i class="fas fa-location-dot" aria-hidden="true"></i>
+              Atualizada em {{ formatarDataLocalizacao(configuracaoLocalizacao.location.capturedAt) }}.
+              Válida até {{ formatarDataLocalizacao(configuracaoLocalizacao.location.expiresAt) }}.
+            </p>
+            <p v-else-if="configuracaoLocalizacao?.enabled" class="account-location-status">
+              <i class="fas fa-circle-info" aria-hidden="true"></i>
+              Nenhuma localização precisa está salva. Ela só será salva após você autorizar o navegador.
+            </p>
+            <p v-else-if="configuracaoLocalizacao" class="account-location-status">
+              <i class="fas fa-circle-info" aria-hidden="true"></i>
+              A localização foi excluída e o salvamento automático está desativado.
+            </p>
+
+            <p v-if="erroLocalizacao" class="account-location-error" role="alert">
+              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>{{ erroLocalizacao }}
+            </p>
+            <p v-if="sucessoLocalizacao" class="account-location-success" role="status">
+              <i class="fas fa-circle-check" aria-hidden="true"></i>{{ sucessoLocalizacao }}
+            </p>
+
+            <div class="account-location-actions">
+              <button
+                class="account-location-update"
+                type="button"
+                :disabled="carregandoLocalizacao || !configuracaoLocalizacao"
+                @click="atualizarLocalizacao"
+              >
+                <i v-if="carregandoLocalizacao" class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                <i v-else class="fas fa-location-crosshairs" aria-hidden="true"></i>
+                {{ configuracaoLocalizacao?.enabled ? 'Atualizar localização' : 'Ativar e atualizar localização' }}
+              </button>
+              <button
+                v-if="configuracaoLocalizacao?.enabled"
+                class="account-location-delete"
+                type="button"
+                :disabled="carregandoLocalizacao"
+                @click="excluirLocalizacao"
+              >
+                {{ configuracaoLocalizacao.location ? 'Excluir localização salva' : 'Desativar salvamento automático' }}
+              </button>
+            </div>
+          </section>
+
           <button class="account-logout" type="button" @click="$emit('sair')">
             <i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i>
             Sair da conta
@@ -122,7 +176,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import type { AuthUser } from '@luxxie/types'
+import type { AuthUser, UserLocationSettings } from '@luxxie/types'
 import { ApiError, api } from '@luxxie/api-client'
 
 const props = defineProps<{
@@ -134,19 +188,37 @@ const emit = defineEmits<{
   fechar: []
   autenticado: [usuario: AuthUser]
   sair: []
+  localizacaoAlterada: [settings: UserLocationSettings]
 }>()
 
 const modo = ref<'login' | 'registro'>('login')
 const carregando = ref(false)
 const erro = ref('')
 const form = reactive({ nome: '', email: '', senha: '' })
+const configuracaoLocalizacao = ref<UserLocationSettings | null>(null)
+const carregandoLocalizacao = ref(false)
+const erroLocalizacao = ref('')
+const sucessoLocalizacao = ref('')
 const iniciais = computed(() => props.usuario?.nome.trim().slice(0, 1).toLocaleUpperCase('pt-BR') ?? '')
+let carregamentoLocalizacaoId = 0
 
 watch(() => props.aberto, (aberto) => {
   if (!aberto) return
   modo.value = 'login'
   erro.value = ''
   carregando.value = false
+})
+
+watch([() => props.aberto, () => props.usuario?.id, () => props.usuario], ([aberto, userId]) => {
+  if (!aberto || !userId) {
+    carregamentoLocalizacaoId += 1
+    configuracaoLocalizacao.value = null
+    carregandoLocalizacao.value = false
+    erroLocalizacao.value = ''
+    sucessoLocalizacao.value = ''
+    return
+  }
+  void carregarConfiguracaoLocalizacao()
 })
 
 function fechar(): void {
@@ -184,6 +256,126 @@ async function enviarFormulario(): Promise<void> {
   } finally {
     carregando.value = false
   }
+}
+
+async function carregarConfiguracaoLocalizacao(): Promise<void> {
+  const requestId = ++carregamentoLocalizacaoId
+  const userId = props.usuario?.id
+  const sessionRevision = api.authSessionRevision()
+  carregandoLocalizacao.value = true
+  erroLocalizacao.value = ''
+  sucessoLocalizacao.value = ''
+  if (!userId || !api.isAuthSessionCurrent(sessionRevision)) {
+    carregandoLocalizacao.value = false
+    return
+  }
+  try {
+    const settings = await api.myLocationSettings(sessionRevision)
+    if (requestId === carregamentoLocalizacaoId
+      && props.usuario?.id === userId
+      && api.isAuthSessionCurrent(sessionRevision)) {
+      configuracaoLocalizacao.value = settings
+    }
+  } catch (error) {
+    if (requestId === carregamentoLocalizacaoId
+      && props.usuario?.id === userId
+      && api.isAuthSessionCurrent(sessionRevision)) {
+      erroLocalizacao.value = error instanceof Error ? error.message : 'Não foi possível consultar a localização salva.'
+    }
+  } finally {
+    if (requestId === carregamentoLocalizacaoId) carregandoLocalizacao.value = false
+  }
+}
+
+function obterLocalizacaoAtual(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Este navegador não oferece geolocalização.'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 12_000,
+      maximumAge: 0,
+    })
+  })
+}
+
+function mensagemErroLocalizacao(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error && error.code === 1) {
+    return 'A permissão foi negada. Permita a localização nas configurações do navegador e tente novamente.'
+  }
+  if (error instanceof Error) return error.message
+  return 'Não foi possível atualizar a localização.'
+}
+
+async function atualizarLocalizacao(): Promise<void> {
+  if (carregandoLocalizacao.value || !props.usuario || !configuracaoLocalizacao.value) return
+  const userId = props.usuario.id
+  const sessionRevision = api.authSessionRevision()
+  const requestId = ++carregamentoLocalizacaoId
+  carregandoLocalizacao.value = true
+  erroLocalizacao.value = ''
+  sucessoLocalizacao.value = ''
+  try {
+    const position = await obterLocalizacaoAtual()
+    if (requestId !== carregamentoLocalizacaoId
+      || props.usuario?.id !== userId
+      || !api.isAuthSessionCurrent(sessionRevision)) return
+
+    const settings = await api.saveMyLocation({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      consentVersion: configuracaoLocalizacao.value.consentVersion,
+    }, sessionRevision)
+    if (requestId !== carregamentoLocalizacaoId
+      || props.usuario?.id !== userId
+      || !api.isAuthSessionCurrent(sessionRevision)) return
+    configuracaoLocalizacao.value = settings
+    sucessoLocalizacao.value = 'Localização atualizada e salva na sua conta.'
+    emit('localizacaoAlterada', settings)
+  } catch (error) {
+    if (requestId === carregamentoLocalizacaoId
+      && props.usuario?.id === userId
+      && api.isAuthSessionCurrent(sessionRevision)) {
+      erroLocalizacao.value = mensagemErroLocalizacao(error)
+    }
+  } finally {
+    if (requestId === carregamentoLocalizacaoId) carregandoLocalizacao.value = false
+  }
+}
+
+async function excluirLocalizacao(): Promise<void> {
+  if (carregandoLocalizacao.value || !props.usuario?.id || !configuracaoLocalizacao.value?.enabled) return
+  const userId = props.usuario.id
+  const sessionRevision = api.authSessionRevision()
+  const requestId = ++carregamentoLocalizacaoId
+  carregandoLocalizacao.value = true
+  erroLocalizacao.value = ''
+  sucessoLocalizacao.value = ''
+  try {
+    const settings = await api.deleteMyLocation(sessionRevision)
+    if (requestId !== carregamentoLocalizacaoId
+      || props.usuario?.id !== userId
+      || !api.isAuthSessionCurrent(sessionRevision)) return
+    configuracaoLocalizacao.value = settings
+    sucessoLocalizacao.value = 'Localização excluída. O salvamento automático foi desativado.'
+    emit('localizacaoAlterada', settings)
+  } catch (error) {
+    if (requestId === carregamentoLocalizacaoId
+      && props.usuario?.id === userId
+      && api.isAuthSessionCurrent(sessionRevision)) {
+      erroLocalizacao.value = error instanceof Error ? error.message : 'Não foi possível excluir a localização salva.'
+    }
+  } finally {
+    if (requestId === carregamentoLocalizacaoId) carregandoLocalizacao.value = false
+  }
+}
+
+function formatarDataLocalizacao(value: string): string {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return 'data indisponível'
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
 function fecharComEscape(event: KeyboardEvent): void {
@@ -379,6 +571,66 @@ onBeforeUnmount(() => document.removeEventListener('keydown', fecharComEscape))
   font-weight: 600;
 }
 
+.account-location {
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.account-location-heading h3 { color: var(--text-dark); font-size: 14px; font-weight: 700; }
+.account-location-heading p { margin-top: 4px; color: var(--text-mid); font-size: 12px; line-height: 1.45; }
+.account-location-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-mid);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.account-location-status i { margin-top: 2px; color: var(--primary); }
+.account-location-actions { display: grid; gap: 8px; margin-top: 14px; }
+.account-location-update,
+.account-location-delete {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+.account-location-update {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.account-location-update:hover:not(:disabled) { filter: brightness(0.95); }
+.account-location-delete {
+  border: 1px solid #fecaca;
+  background: #fff;
+  color: #b91c1c;
+}
+.account-location-delete:hover:not(:disabled) { background: #fff1f1; }
+.account-location-update:disabled,
+.account-location-delete:disabled { cursor: wait; opacity: 0.65; }
+.account-location-error,
+.account-location-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.account-location-error { color: #b91c1c; }
+.account-location-success { color: #15803d; }
+
 .account-logout {
   display: flex;
   width: 100%;
@@ -398,6 +650,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', fecharComEscape))
 .account-close:focus-visible,
 .account-submit:focus-visible,
 .account-switch button:focus-visible,
+.account-location-update:focus-visible,
+.account-location-delete:focus-visible,
 .account-logout:focus-visible {
   outline: 3px solid rgba(0, 87, 255, 0.28);
   outline-offset: 2px;

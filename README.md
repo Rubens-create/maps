@@ -35,6 +35,7 @@ O Compose aplica as migrações antes de iniciar a API e mantém o PostgreSQL em
 - `POST /api/properties` e `DELETE /api/properties/:id` (Bearer token)
 - `GET /api/users/me` e `GET /api/users/me/properties` (Bearer token)
 - `GET /api/favorites`, `POST /api/favorites/:propertyId` e `DELETE /api/favorites/:propertyId` (Bearer token)
+- `POST /api/auth/logout` revoga a sessão atual; `GET`, `PUT`, `POST /api/users/me/location/refresh` e `DELETE /api/users/me/location` (Bearer token) controlam a localização da conta e sua versão de consentimento
 
 A tela do mapa consulta novamente após movimento/zoom, com debounce e cancelamento de pedidos antigos. A API limita a consulta à bounding box visível, aplica filtros no banco e agrupa pontos próximos conforme o zoom.
 

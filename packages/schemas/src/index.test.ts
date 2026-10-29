@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MapBoundsSchema } from './index.js'
+import { MapBoundsSchema, UserPreciseLocationInputSchema } from './index.js'
 
 describe('MapBoundsSchema', () => {
   it('parses numeric query values and keeps a valid viewport', () => {
@@ -43,5 +43,23 @@ describe('MapBoundsSchema', () => {
       west: '-47.9', south: '-23.7', east: '-46.4', north: '-23.3', zoom: '12',
       precoMaiorQue: '900000', precoMenorQue: '250000',
     })).toThrow()
+  })
+})
+
+describe('UserPreciseLocationInputSchema', () => {
+  it('requires valid coordinates and the current location-consent version', () => {
+    expect(UserPreciseLocationInputSchema.parse({ latitude: -23.55, longitude: -46.63, consentVersion: 0 })).toEqual({
+      latitude: -23.55,
+      longitude: -46.63,
+      consentVersion: 0,
+    })
+    expect(() => UserPreciseLocationInputSchema.parse({ latitude: -23.55, longitude: -46.63 })).toThrow()
+    expect(() => UserPreciseLocationInputSchema.parse({ latitude: 0, longitude: 0, consentVersion: -1 })).toThrow()
+  })
+
+  it('rejects invalid coordinates and caller-supplied identity fields', () => {
+    expect(() => UserPreciseLocationInputSchema.parse({ latitude: 91, longitude: 0, consentVersion: 0 })).toThrow()
+    expect(() => UserPreciseLocationInputSchema.parse({ latitude: 0, longitude: 181, consentVersion: 0 })).toThrow()
+    expect(() => UserPreciseLocationInputSchema.parse({ latitude: 0, longitude: 0, consentVersion: 0, userId: 'other-user' })).toThrow()
   })
 })

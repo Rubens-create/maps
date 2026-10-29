@@ -92,6 +92,13 @@ export const PropertyInputSchema = z.object({
   endereco: z.string().trim().max(255).nullable().optional(),
 })
 
+export const UserPreciseLocationInputSchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  consentVersion: z.number().int().nonnegative(),
+}).strict()
+
 export type RegisterInput = z.infer<typeof RegisterSchema>
 export type LoginInput = z.infer<typeof LoginSchema>
 export type PropertyInput = z.infer<typeof PropertyInputSchema>
+export type UserPreciseLocationInput = z.infer<typeof UserPreciseLocationInputSchema>
