@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common'
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
-import { PropertyInputSchema } from '@luxxie/schemas'
-import type { PropertyInput } from '@luxxie/types'
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { CityPropertiesQuerySchema, PropertyInputSchema } from '@luxxie/schemas'
+import type { CityPropertiesQuery, PropertyInput } from '@luxxie/types'
 import { AuthenticatedRequest, JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { ZodValidationPipe } from '../common/zod-validation.pipe'
 import { PropertiesService } from './properties.service'
@@ -33,6 +33,16 @@ const propertyBody = {
 @Controller('properties')
 export class PropertiesController {
   constructor(private readonly properties: PropertiesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Buscar imóveis por cidade e tipo de transação' })
+  @ApiQuery({ name: 'cidade', type: String, required: true, description: 'Nome da cidade; comparação sem diferenciar maiúsculas/minúsculas' })
+  @ApiQuery({ name: 'tipo', enum: ['Venda', 'Aluguel'], required: false, description: 'Opcional. Venda (compra) ou Aluguel' })
+  @ApiResponse({ status: 200, description: 'Imóveis cadastrados na cidade, opcionalmente filtrados por tipo' })
+  @ApiResponse({ status: 400, description: 'Cidade ou tipo de transação inválidos' })
+  findByCity(@Query(new ZodValidationPipe(CityPropertiesQuerySchema)) query: CityPropertiesQuery) {
+    return this.properties.findByCity(query)
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Consultar os detalhes públicos de um imóvel' })

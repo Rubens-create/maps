@@ -1,4 +1,5 @@
 export type {
+  CityPropertiesQuery,
   MapBounds,
   MapResult,
   MapResultItem,

@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { LoginSchema, RegisterSchema } from '@luxxie/schemas'
 import type { LoginInput, RegisterInput } from '@luxxie/types'
 import { ZodValidationPipe } from '../common/zod-validation.pipe'
@@ -50,6 +50,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Encerrar a sessão autenticada atual' })
   @ApiResponse({ status: 200, description: 'Sessão revogada' })
   logout(@Req() request: AuthenticatedRequest) {

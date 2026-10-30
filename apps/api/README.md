@@ -15,6 +15,7 @@ API HTTP em NestJS/TypeScript. A documentação OpenAPI/Swagger fica em `/docs` 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/map/properties?west=...&south=...&east=...&north=...&zoom=...`
+- `GET /api/properties?cidade=Campinas&tipo=Aluguel` (tipo opcional: `Venda` para compra ou `Aluguel`; cidade sem distinção entre maiúsculas/minúsculas)
 - `GET /api/properties/:id`
 - `POST /api/properties` com Bearer token
 - `DELETE /api/properties/:id` com Bearer token

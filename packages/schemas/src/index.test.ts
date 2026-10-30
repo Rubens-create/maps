@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MapBoundsSchema, UserPreciseLocationInputSchema } from './index.js'
+import { CityPropertiesQuerySchema, MapBoundsSchema, UserPreciseLocationInputSchema } from './index.js'
 
 describe('MapBoundsSchema', () => {
   it('parses numeric query values and keeps a valid viewport', () => {
@@ -61,5 +61,20 @@ describe('UserPreciseLocationInputSchema', () => {
     expect(() => UserPreciseLocationInputSchema.parse({ latitude: 91, longitude: 0, consentVersion: 0 })).toThrow()
     expect(() => UserPreciseLocationInputSchema.parse({ latitude: 0, longitude: 181, consentVersion: 0 })).toThrow()
     expect(() => UserPreciseLocationInputSchema.parse({ latitude: 0, longitude: 0, consentVersion: 0, userId: 'other-user' })).toThrow()
+  })
+})
+
+describe('CityPropertiesQuerySchema', () => {
+  it('trims city names and accepts the optional sale or rent filter', () => {
+    expect(CityPropertiesQuerySchema.parse({ cidade: '  Campinas  ', tipo: 'Aluguel' })).toEqual({
+      cidade: 'Campinas',
+      tipo: 'Aluguel',
+    })
+    expect(CityPropertiesQuerySchema.parse({ cidade: 'Campinas' })).toEqual({ cidade: 'Campinas' })
+  })
+
+  it('rejects empty city names and unsupported transaction types', () => {
+    expect(() => CityPropertiesQuerySchema.parse({ cidade: '  ' })).toThrow()
+    expect(() => CityPropertiesQuerySchema.parse({ cidade: 'Campinas', tipo: 'Compra' })).toThrow()
   })
 })

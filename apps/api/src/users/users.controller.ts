@@ -1,11 +1,22 @@
 import { Body, Controller, Delete, Get, Header, Post, Put, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger'
 import { UserPreciseLocationInputSchema } from '@luxxie/schemas'
 import type { UserPreciseLocationInput } from '@luxxie/types'
 import { DatabaseService } from '../database/database.service'
 import { AuthenticatedRequest, JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { ZodValidationPipe } from '../common/zod-validation.pipe'
 import { UserLocationsService } from './user-locations.service'
+
+const preciseLocationBody = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    latitude: { type: 'number', minimum: -90, maximum: 90 },
+    longitude: { type: 'number', minimum: -180, maximum: 180 },
+    consentVersion: { type: 'integer', minimum: 0 },
+  },
+  required: ['latitude', 'longitude', 'consentVersion'],
+}
 
 @ApiTags('Usuários')
 @ApiBearerAuth()
@@ -55,6 +66,7 @@ export class UsersController {
   @Put('me/location')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Atualizar localização precisa autorizada da conta' })
+  @ApiBody({ schema: preciseLocationBody })
   @ApiResponse({ status: 200, description: 'Localização atualizada com prazo de validade' })
   saveMyLocation(
     @Body(new ZodValidationPipe(UserPreciseLocationInputSchema)) body: UserPreciseLocationInput,
@@ -66,6 +78,7 @@ export class UsersController {
   @Post('me/location/refresh')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Atualizar localização após consentimento já ativo' })
+  @ApiBody({ schema: preciseLocationBody })
   @ApiResponse({ status: 200, description: 'Localização atualizada sem alterar a preferência de consentimento' })
   refreshMyLocation(
     @Body(new ZodValidationPipe(UserPreciseLocationInputSchema)) body: UserPreciseLocationInput,

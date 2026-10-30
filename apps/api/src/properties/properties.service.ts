@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import type { PropertyInput } from '@luxxie/types'
+import type { CityPropertiesQuery, PropertyInput } from '@luxxie/types'
 import { DatabaseService } from '../database/database.service'
 
 @Injectable()
@@ -41,6 +41,22 @@ export class PropertiesService {
     )
     if (!result.rowCount) throw new NotFoundException('Imóvel não encontrado')
     return result.rows[0]
+  }
+
+  async findByCity(query: CityPropertiesQuery) {
+    const result = await this.database.query(
+      `SELECT id, created_at, titulo, descricao, tipo, preco::float8 AS preco,
+              quartos, banheiros, area::float8 AS area, aceita_pet, whatsapp, foto_capa,
+              ST_Y(location) AS latitude, ST_X(location) AS longitude,
+              cidade, estado, bairro, endereco
+       FROM properties
+       WHERE cidade IS NOT NULL
+         AND LOWER(BTRIM(cidade)) = LOWER($1)
+         AND ($2::text IS NULL OR tipo = $2)
+       ORDER BY created_at DESC`,
+      [query.cidade, query.tipo ?? null],
+    )
+    return result.rows
   }
 
   async delete(id: number, userId: string): Promise<void> {

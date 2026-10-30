@@ -31,6 +31,7 @@ O Compose aplica as migrações antes de iniciar a API e mantém o PostgreSQL em
 - `GET /api/health`
 - `POST /api/auth/register` e `POST /api/auth/login`
 - `GET /api/map/properties?west=...&south=...&east=...&north=...&zoom=...&tipo=...`
+- `GET /api/properties?cidade=Campinas&tipo=Aluguel` (tipo opcional: `Venda` ou `Aluguel`; cidade comparada sem diferenciar maiúsculas/minúsculas)
 - `GET /api/properties/:id`
 - `POST /api/properties` e `DELETE /api/properties/:id` (Bearer token)
 - `GET /api/users/me` e `GET /api/users/me/properties` (Bearer token)

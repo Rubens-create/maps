@@ -2,9 +2,14 @@
   <div class="dashboard-page">
     <header class="dash-header">
       <div class="header-content">
-        <a class="btn-back" :href="webUrl">
-          <i class="fas fa-map-marked-alt"></i> Ver anúncios públicos
-        </a>
+        <div class="header-links">
+          <a class="btn-back" :href="webUrl">
+            <i class="fas fa-map-marked-alt"></i> Ver anúncios públicos
+          </a>
+          <RouterLink class="btn-back" to="/api">
+            <i class="fas fa-code" aria-hidden="true"></i> API
+          </RouterLink>
+        </div>
         <div class="user-info" v-if="user">
           <div class="avatar">{{ iniciais }}</div>
           <div>
@@ -220,6 +225,7 @@ onMounted(checarSessao)
 .btn-back:hover { background: var(--border); color: var(--text-dark); }
 .btn-logout:hover { background: #fff1f1; border-color: #fca5a5; color: var(--danger); }
 .btn-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.header-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .user-info {
   display: flex;

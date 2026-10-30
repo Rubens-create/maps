@@ -27,6 +27,13 @@ export type MapPropertyFilters = Pick<MapBounds,
   'precoMaiorQue' | 'precoMenorQue' | 'quartos' | 'banheiros' | 'areaMin' | 'aceitaPet'
 >
 
+export const CityPropertiesQuerySchema = z.object({
+  cidade: z.string().trim().min(1).max(100),
+  tipo: z.enum(['Venda', 'Aluguel']).optional(),
+})
+
+export type CityPropertiesQuery = z.infer<typeof CityPropertiesQuerySchema>
+
 export const PropertyMapItemSchema = z.object({
   id: z.number().int().positive(),
   titulo: z.string(),
